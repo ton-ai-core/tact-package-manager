@@ -1,0 +1,36 @@
+{
+  "name": "tact-package-manager",
+  "version": "1.0.0",
+  "description": "Package manager for Tact smart contract language",
+  "main": "dist/cli.js",
+  "bin": {
+    "tpm": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && cp tact-aliases.json dist/",
+    "start": "node dist/cli.js",
+    "dev": "ts-node src/cli.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ton-ai-core/tact-package-manager.git"
+  },
+  "keywords": ["tact", "package-manager", "smart-contracts", "ton"],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ton-ai-core/tact-package-manager/issues"
+  },
+  "homepage": "https://github.com/ton-ai-core/tact-package-manager#readme",
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.11.16",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "fs-extra": "^11.2.0",
+    "simple-git": "^3.22.0"
+  }
+}
