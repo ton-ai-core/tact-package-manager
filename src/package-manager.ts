@@ -1,6 +1,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { GitHandler, GitError } from './git-handler';
+import { AliasSync, AliasSyncError } from './alias-sync';
 import { PackageAlias, PackageState, CommandOptions } from './types';
 
 export class PackageManagerError extends Error {
@@ -12,6 +13,7 @@ export class PackageManagerError extends Error {
 
 export class PackageManager {
     private gitHandler: GitHandler;
+    private aliasSync: AliasSync;
     private aliasPath: string;
     private statePath: string;
     private aliases: PackageAlias;
@@ -20,9 +22,29 @@ export class PackageManager {
     constructor() {
         this.gitHandler = new GitHandler();
         this.aliasPath = path.join(__dirname, 'tact-aliases.json');
+        this.aliasSync = new AliasSync(this.aliasPath);
         this.statePath = path.join(process.cwd(), 'tact-packages.json');
         this.aliases = {};
         this.state = {};
+    }
+
+    public async initialize(): Promise<void> {
+        try {
+            // Сначала пытаемся синхронизировать файл алиасов
+            await this.aliasSync.sync();
+        } catch (error) {
+            // Если синхронизация не удалась, проверяем наличие локального файла
+            if (!fs.existsSync(this.aliasPath)) {
+                if (error instanceof Error) {
+                    throw new PackageManagerError(`Failed to initialize: ${error.message}`);
+                }
+                throw new PackageManagerError('Failed to initialize: Unable to sync or find aliases file');
+            }
+            // Если локальный файл есть, продолжаем работу с ним
+            console.warn('Failed to sync aliases, using local file');
+        }
+
+        // Загружаем конфигурацию
         this.loadConfig();
     }
 
@@ -55,7 +77,30 @@ export class PackageManager {
         }
     }
 
+    public async syncAliases(): Promise<void> {
+        try {
+            await this.aliasSync.sync();
+            // Перезагружаем конфигурацию после синхронизации
+            this.loadConfig();
+        } catch (error) {
+            if (error instanceof AliasSyncError) {
+                throw new PackageManagerError(`Failed to sync aliases: ${error.message}`);
+            }
+            if (error instanceof Error) {
+                throw new PackageManagerError(`Failed to sync aliases: ${error.message}`);
+            }
+            throw new PackageManagerError('Failed to sync aliases: Unknown error');
+        }
+    }
+
     async install(alias: string, options: CommandOptions = {}): Promise<void> {
+        // Синхронизируем алиасы перед установкой
+        try {
+            await this.syncAliases();
+        } catch (error) {
+            console.warn('Failed to sync aliases, using local file');
+        }
+
         if (!this.aliases[alias]) {
             throw new PackageManagerError(`Alias "${alias}" not found in tact-aliases.json`);
         }

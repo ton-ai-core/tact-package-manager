@@ -6,10 +6,25 @@ import { PackageManager } from './package-manager';
 const program = new Command();
 const manager = new PackageManager();
 
+// Инициализируем менеджер перед запуском команд
+const initialize = async () => {
+    try {
+        await manager.initialize();
+    } catch (error) {
+        if (error instanceof Error) {
+            console.error('Initialization error:', error.message);
+        } else {
+            console.error('An unknown error occurred during initialization');
+        }
+        process.exit(1);
+    }
+};
+
 program
     .name('tpm')
     .description('Tact Package Manager')
-    .version('1.0.0');
+    .version('1.0.0')
+    .hook('preAction', initialize);
 
 program
     .command('install')
@@ -53,6 +68,23 @@ program
     .action(async (alias: string) => {
         try {
             await manager.remove(alias);
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error:', error.message);
+            } else {
+                console.error('An unknown error occurred');
+            }
+            process.exit(1);
+        }
+    });
+
+program
+    .command('sync')
+    .description('Synchronize aliases with the remote repository')
+    .action(async () => {
+        try {
+            await manager.syncAliases();
+            console.log('Successfully synchronized aliases');
         } catch (error) {
             if (error instanceof Error) {
                 console.error('Error:', error.message);

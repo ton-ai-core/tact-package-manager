@@ -7,7 +7,7 @@
     "tpm": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc && cp tact-aliases.json dist/",
+    "build": "tsc",
     "start": "node dist/cli.js",
     "dev": "ts-node src/cli.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
