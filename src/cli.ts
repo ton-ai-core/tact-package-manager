@@ -2,9 +2,11 @@
 
 import { Command } from 'commander';
 import { PackageManager } from './package-manager';
+import { WorkspaceManager, WorkspaceError } from './workspace-manager';
 
 const program = new Command();
 const manager = new PackageManager();
+const workspaceManager = new WorkspaceManager();
 
 // Инициализируем менеджер перед запуском команд
 const initialize = async () => {
@@ -85,6 +87,62 @@ program
         try {
             await manager.syncAliases();
             console.log('Successfully synchronized aliases');
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error:', error.message);
+            } else {
+                console.error('An unknown error occurred');
+            }
+            process.exit(1);
+        }
+    });
+
+// Команда для установки зависимостей
+program
+    .command('deps')
+    .description('Install dependencies for all modules')
+    .action(async () => {
+        try {
+            await workspaceManager.installDependencies();
+            console.log('Successfully installed dependencies');
+        } catch (error) {
+            if (error instanceof WorkspaceError) {
+                console.error('Error:', error.message);
+            } else if (error instanceof Error) {
+                console.error('Error:', error.message);
+            } else {
+                console.error('An unknown error occurred');
+            }
+            process.exit(1);
+        }
+    });
+
+// Новая команда для запуска скриптов модуля
+program
+    .command('run')
+    .description('Run a script in a module')
+    .argument('<module>', 'module name')
+    .argument('<script>', 'script name')
+    .action(async (moduleName: string, script: string) => {
+        try {
+            await manager.runScript(moduleName, script);
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error:', error.message);
+            } else {
+                console.error('An unknown error occurred');
+            }
+            process.exit(1);
+        }
+    });
+
+// Добавляем поддержку прямых команд (например, tpm jetton build)
+program
+    .arguments('<module> <script>')
+    .description('Run a script in a module (shorthand syntax)')
+    .action(async (moduleName: string, script: string) => {
+        try {
+            await manager.runScript(moduleName, script);
         } catch (error) {
             if (error instanceof Error) {
                 console.error('Error:', error.message);

@@ -2,6 +2,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { GitHandler, GitError } from './git-handler';
 import { AliasSync, AliasSyncError } from './alias-sync';
+import { WorkspaceManager, WorkspaceError } from './workspace-manager';
 import { PackageAlias, PackageState, CommandOptions } from './types';
 
 export class PackageManagerError extends Error {
@@ -14,6 +15,7 @@ export class PackageManagerError extends Error {
 export class PackageManager {
     private gitHandler: GitHandler;
     private aliasSync: AliasSync;
+    private workspaceManager: WorkspaceManager;
     private aliasPath: string;
     private statePath: string;
     private aliases: PackageAlias;
@@ -23,6 +25,7 @@ export class PackageManager {
         this.gitHandler = new GitHandler();
         this.aliasPath = path.join(__dirname, 'tact-aliases.json');
         this.aliasSync = new AliasSync(this.aliasPath);
+        this.workspaceManager = new WorkspaceManager();
         this.statePath = path.join(process.cwd(), 'tact-packages.json');
         this.aliases = {};
         this.state = {};
@@ -30,7 +33,10 @@ export class PackageManager {
 
     public async initialize(): Promise<void> {
         try {
-            // Сначала пытаемся синхронизировать файл алиасов
+            // Инициализируем workspace
+            await this.workspaceManager.initialize();
+
+            // Синхронизируем алиасы
             await this.aliasSync.sync();
         } catch (error) {
             // Если синхронизация не удалась, проверяем наличие локального файла
@@ -109,6 +115,9 @@ export class PackageManager {
             const url = this.aliases[alias];
             const commitHash = await this.gitHandler.cloneRepository(url, alias, options.commit);
 
+            // Добавляем модуль в workspace
+            await this.workspaceManager.addModule(alias);
+
             this.state[alias] = {
                 url,
                 commitHash,
@@ -118,7 +127,7 @@ export class PackageManager {
             this.saveState();
             console.log(`Successfully installed ${alias} at commit ${commitHash}`);
         } catch (error) {
-            if (error instanceof GitError) {
+            if (error instanceof GitError || error instanceof WorkspaceError) {
                 throw new PackageManagerError(`Installation failed: ${error.message}`);
             }
             if (error instanceof Error) {
@@ -138,7 +147,7 @@ export class PackageManager {
             }
 
             try {
-                const modulePath = path.join(process.cwd(), 'node_modules', 'tact_modules', pkg);
+                const modulePath = path.join(process.cwd(), 'tact_modules', pkg);
                 const hasUpdates = await this.gitHandler.checkForUpdates(
                     modulePath,
                     this.state[pkg].commitHash
@@ -165,8 +174,11 @@ export class PackageManager {
         }
 
         try {
-            const modulePath = path.join(process.cwd(), 'node_modules', 'tact_modules', alias);
+            const modulePath = path.join(process.cwd(), 'tact_modules', alias);
             await fs.remove(modulePath);
+
+            // Удаляем модуль из workspace
+            await this.workspaceManager.removeModule(alias);
 
             delete this.state[alias];
             this.saveState();
@@ -176,6 +188,24 @@ export class PackageManager {
                 throw new PackageManagerError(`Failed to remove ${alias}: ${error.message}`);
             }
             throw new PackageManagerError(`Failed to remove ${alias}: Unknown error`);
+        }
+    }
+
+    async runScript(moduleName: string, script: string): Promise<void> {
+        if (!this.state[moduleName]) {
+            throw new PackageManagerError(`Package "${moduleName}" is not installed`);
+        }
+
+        try {
+            await this.workspaceManager.runModuleScript(moduleName, script);
+        } catch (error) {
+            if (error instanceof WorkspaceError) {
+                throw new PackageManagerError(`Script execution failed: ${error.message}`);
+            }
+            if (error instanceof Error) {
+                throw new PackageManagerError(`Script execution failed: ${error.message}`);
+            }
+            throw new PackageManagerError('Script execution failed: Unknown error');
         }
     }
 } 

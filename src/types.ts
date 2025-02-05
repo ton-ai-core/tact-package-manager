@@ -13,4 +13,20 @@ export interface PackageState {
 export interface CommandOptions {
     commit?: string;
     force?: boolean;
+}
+
+export interface WorkspaceConfig {
+    private: boolean;
+    name: string;
+    workspaces: string[];
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+}
+
+export interface TactModuleConfig {
+    name?: string;
+    version?: string;
+    scripts?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
 } 
